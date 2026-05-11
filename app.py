@@ -8,6 +8,9 @@ import numpy as np
 import os
 from werkzeug.utils import secure_filename
 
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+
 # ===============================
 # Configuration
 # ===============================
@@ -73,7 +76,7 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 # ===============================
 # Load Model
 # ===============================
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 print(f"Using device: {device}")
 
 model = CNNModel(num_classes=6).to(device)
@@ -82,7 +85,7 @@ model_path = 'best_rice_model.pth'
 if not os.path.exists(model_path):
     raise FileNotFoundError(f"Model file not found: {model_path}")
 
-model.load_state_dict(torch.load(model_path, map_location=device))
+model.load_state_dict(torch.load(model_path, map_location='cpu'))
 model.eval()
 
 # Define transformation
