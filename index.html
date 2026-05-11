@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rice Leaf Disease Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .upload-section {
+            margin-bottom: 30px;
+        }
+        
+        .upload-box {
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+        
+        .upload-box:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+        
+        .upload-box.dragover {
+            border-color: #764ba2;
+            background: #e8eaff;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        
+        .upload-text {
+            color: #333;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .upload-hint {
+            color: #999;
+            font-size: 12px;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .preview-section {
+            display: none;
+            margin-bottom: 30px;
+        }
+        
+        .preview-section.show {
+            display: block;
+        }
+        
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-predict {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-predict:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-predict:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-clear {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-clear:hover {
+            background: #e0e0e0;
+        }
+        
+        .result-section {
+            display: none;
+            background: #f8f9ff;
+            border-radius: 10px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+        
+        .result-section.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .result-title {
+            color: #667eea;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .result-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        
+        .result-label {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .result-value {
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .disease-name {
+            font-size: 24px;
+            color: #764ba2;
+            text-transform: capitalize;
+        }
+        
+        .confidence-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .probabilities {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+        }
+        
+        .probability-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+        }
+        
+        .prob-label {
+            color: #666;
+            font-size: 13px;
+            flex: 1;
+        }
+        
+        .prob-bar {
+            flex: 0 0 150px;
+            height: 6px;
+            background: #f0f0f0;
+            border-radius: 3px;
+            margin: 0 10px;
+            overflow: hidden;
+        }
+        
+        .prob-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 3px;
+        }
+        
+        .prob-value {
+            color: #333;
+            font-weight: 600;
+            font-size: 13px;
+            flex: 0 0 50px;
+            text-align: right;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .spinner {
+            border: 4px solid #f0f0f0;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #ffebee;
+            border: 1px solid #ef5350;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+        
+        .error.show {
+            display: block;
+        }
+        
+        .success {
+            background: #e8f5e9;
+            border: 1px solid #66bb6a;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+        
+        .success.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌾 Rice Leaf Disease Detection</h1>
+        <p class="subtitle">Using Deep Learning AI to detect rice leaf diseases</p>
+        
+        <div class="upload-section">
+            <div class="upload-box" id="uploadBox">
+                <div class="upload-icon">📸</div>
+                <div class="upload-text">Click to upload or drag and drop</div>
+                <div class="upload-hint">PNG, JPG, JPEG, GIF, BMP (Max 10MB)</div>
+                <input type="file" id="fileInput" accept="image/*">
+            </div>
+        </div>
+        
+        <div class="preview-section" id="previewSection">
+            <img id="previewImage" class="preview-image" alt="Preview">
+            <div class="button-group">
+                <button class="btn-predict" id="predictBtn">🔍 Predict Disease</button>
+                <button class="btn-clear" id="clearBtn">✕ Clear</button>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="color: #667eea; margin-top: 10px;">Analyzing image...</p>
+        </div>
+        
+        <div class="error" id="errorBox"></div>
+        <div class="success" id="successBox"></div>
+        
+        <div class="result-section" id="resultSection">
+            <div class="result-title">Prediction Result</div>
+            
+            <div class="result-item">
+                <span class="result-label">Disease:</span>
+                <span class="disease-name" id="diseaseName">-</span>
+            </div>
+            
+            <div class="result-item">
+                <span class="result-label">Confidence:</span>
+                <span class="result-value" id="confidenceValue">-</span>
+            </div>
+            <div class="confidence-bar">
+                <div class="confidence-fill" id="confidenceFill"></div>
+            </div>
+            
+            <div class="probabilities">
+                <div style="color: #667eea; font-weight: 600; margin-bottom: 12px;">All Disease Probabilities</div>
+                <div id="probabilitiesList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+        const previewSection = document.getElementById('previewSection');
+        const previewImage = document.getElementById('previewImage');
+        const predictBtn = document.getElementById('predictBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const loading = document.getElementById('loading');
+        const resultSection = document.getElementById('resultSection');
+        const errorBox = document.getElementById('errorBox');
+        const successBox = document.getElementById('successBox');
+
+        // Upload box click
+        uploadBox.addEventListener('click', () => fileInput.click());
+
+        // Drag and drop
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.classList.add('dragover');
+        });
+
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('dragover');
+        });
+
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileSelect();
+            }
+        });
+
+        // File input change
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleFileSelect() {
+            const file = fileInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImage.src = e.target.result;
+                    previewSection.classList.add('show');
+                    resultSection.classList.remove('show');
+                    clearError();
+                    clearSuccess();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Predict button
+        predictBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                showError('Please select an image first');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            loading.classList.add('show');
+            clearError();
+            clearSuccess();
+
+            try {
+                const response = await fetch('/api/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Prediction failed');
+                }
+
+                displayResult(data.prediction);
+                showSuccess('Prediction completed successfully!');
+
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                loading.classList.remove('show');
+            }
+        });
+
+        // Clear button
+        clearBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            previewSection.classList.remove('show');
+            resultSection.classList.remove('show');
+            clearError();
+            clearSuccess();
+        });
+
+        function displayResult(prediction) {
+            document.getElementById('diseaseName').textContent = prediction.disease;
+            
+            const confidence = prediction.confidence;
+            document.getElementById('confidenceValue').textContent = 
+                `${(confidence * 100).toFixed(2)}%`;
+            document.getElementById('confidenceFill').style.width = 
+                `${confidence * 100}%`;
+
+            // Display all probabilities
+            const probList = document.getElementById('probabilitiesList');
+            probList.innerHTML = '';
+            
+            // Sort by probability (descending)
+            const sortedProbs = Object.entries(prediction.all_probabilities)
+                .sort((a, b) => b[1] - a[1]);
+
+            sortedProbs.forEach(([disease, prob]) => {
+                const item = document.createElement('div');
+                item.className = 'probability-item';
+                const probPercent = (prob * 100).toFixed(2);
+                item.innerHTML = `
+                    <span class="prob-label">${disease}</span>
+                    <div class="prob-bar">
+                        <div class="prob-fill" style="width: ${prob * 100}%"></div>
+                    </div>
+                    <span class="prob-value">${probPercent}%</span>
+                `;
+                probList.appendChild(item);
+            });
+
+            resultSection.classList.add('show');
+        }
+
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.classList.add('show');
+        }
+
+        function clearError() {
+            errorBox.classList.remove('show');
+            errorBox.textContent = '';
+        }
+
+        function showSuccess(message) {
+            successBox.textContent = message;
+            successBox.classList.add('show');
+            setTimeout(() => clearSuccess(), 3000);
+        }
+
+        function clearSuccess() {
+            successBox.classList.remove('show');
+            successBox.textContent = '';
+        }
+    </script>
+</body>
+</html>
