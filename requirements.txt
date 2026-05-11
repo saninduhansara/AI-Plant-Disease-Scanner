@@ -4,5 +4,6 @@ numpy>=1.21.0
 Pillow>=9.0.0
 Flask>=2.0.0
 Flask-CORS>=3.0.10
+gunicorn>=21.2.0
 matplotlib>=3.5.0
 tqdm>=4.60.0

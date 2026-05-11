@@ -296,6 +296,7 @@ def request_entity_too_large(error):
 # Run Flask App
 # ===============================
 if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8000))
     print("\n" + "="*60)
     print("Rice Leaf Disease Detection API")
     print("="*60)
@@ -303,9 +304,9 @@ if __name__ == '__main__':
     print(f"Device: {device}")
     print(f"Upload Folder: {UPLOAD_FOLDER}")
     print("="*60)
-    print("Starting server on http://localhost:8000")
-    print("Web UI: http://localhost:8000/")
-    print("API Documentation: http://localhost:8000/api/docs")
+    print(f"Starting server on http://localhost:{port}")
+    print(f"Web UI: http://localhost:{port}/")
+    print(f"API Documentation: http://localhost:{port}/api/docs")
     print("="*60 + "\n")
     
-    app.run(debug=True, host='0.0.0.0', port=8000)
+    app.run(debug=True, host='0.0.0.0', port=port)
