@@ -14,8 +14,15 @@ os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '2')
 
 try:
     import tensorflow as tf
-    tf.config.threading.set_intra_op_parallelism_threads(1)
-    tf.config.threading.set_inter_op_parallelism_threads(1)
+    # Allow TensorFlow to decide thread parallelism by default. If you need to
+    # limit threads for your environment, set TF_NUM_THREADS environment var.
+    try:
+        num_threads = int(os.environ.get('TF_NUM_THREADS', '0'))
+    except ValueError:
+        num_threads = 0
+    if num_threads > 0:
+        tf.config.threading.set_intra_op_parallelism_threads(num_threads)
+        tf.config.threading.set_inter_op_parallelism_threads(num_threads)
 except Exception:
     tf = None
 
@@ -72,10 +79,31 @@ logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s - %(
 try:
     logging.info('Warming up TensorFlow model...')
     dummy = np.zeros((1, IMAGE_SIZE[0], IMAGE_SIZE[1], 3), dtype=np.float32)
-    _ = model.predict(dummy, verbose=0)
+    # Create a compiled TF function for faster repeated inference when TF is present
+    try:
+        if 'tf' in globals() and tf is not None:
+            @tf.function(experimental_relax_shapes=True)
+            def _tf_predict(x):
+                return model(x, training=False)
+            _ = _tf_predict(tf.convert_to_tensor(dummy, dtype=tf.float32)).numpy()
+        else:
+            _ = model.predict(dummy, verbose=0)
+    except Exception:
+        # Fallback to model.predict if tf.function fails for some reason
+        _ = model.predict(dummy, verbose=0)
     logging.info('Model warm-up complete')
 except Exception as exc:
     logging.warning(f'Model warm-up failed: {exc}')
+
+# If TF is available, expose the compiled predict function for inference path
+_tf_predict = None
+if 'tf' in globals() and tf is not None:
+    try:
+        @tf.function(experimental_relax_shapes=True)
+        def _tf_predict(x):
+            return model(x, training=False)
+    except Exception:
+        _tf_predict = None
 
 
 # ===============================
@@ -108,7 +136,16 @@ def predict_disease(image_path):
     start_total = time.time()
     image_array = preprocess_image(image_path)
     start_pred = time.time()
-    predictions = model.predict(image_array, verbose=0)
+    # Use compiled TF function when available (faster repeated inference)
+    if _tf_predict is not None:
+        try:
+            import tensorflow as _tf
+            input_tensor = _tf.convert_to_tensor(image_array, dtype=_tf.float32)
+            predictions = _tf_predict(input_tensor).numpy()
+        except Exception:
+            predictions = model.predict(image_array, verbose=0)
+    else:
+        predictions = model.predict(image_array, verbose=0)
     pred_time = time.time() - start_pred
     total_time = time.time() - start_total
 
@@ -292,4 +329,5 @@ if __name__ == '__main__':
     print(f'API Documentation: http://localhost:{port}/api/docs')
     print('=' * 60 + '\n')
 
-    app.run(debug=True, host='0.0.0.0', port=port)
+    debug_mode = os.environ.get('FLASK_DEBUG', '0') == '1'
+    app.run(debug=debug_mode, host='0.0.0.0', port=port)
