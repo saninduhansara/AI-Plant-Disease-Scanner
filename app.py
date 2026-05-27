@@ -90,6 +90,9 @@ class_labels = {
     for index in range(num_classes)
 }
 
+# Warm up TensorFlow so the first upload does not pay the full initialization cost.
+_ = model(np.zeros((1, IMG_SIZE, IMG_SIZE, 3), dtype=np.float32), training=False)
+
 # ===============================
 # Flask App
 # ===============================
@@ -125,16 +128,34 @@ def preprocess_image(image_path):
     return img
 
 
+def preprocess_image_bytes(image_bytes):
+    img_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+
+    if img is None:
+        raise ValueError("Invalid image")
+
+    img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
+    img = img.astype('float32') / 255.0
+    img = np.expand_dims(img, axis=0)
+
+    return img
+
+
 def predict_image(image_path):
     img = preprocess_image(image_path)
 
-    preds = model.predict(img)
-    class_id = np.argmax(preds)
+    return predict_from_array(img)
+
+
+def predict_from_array(img):
+    preds = model(img, training=False).numpy()
+    class_id = int(np.argmax(preds))
     confidence = float(np.max(preds))
 
     return {
-        "class_id": int(class_id),
-        "disease": class_labels[int(class_id)],
+        "class_id": class_id,
+        "disease": class_labels[class_id],
         "confidence": round(confidence, 4),
         "all_probabilities": {
             class_labels[i]: float(preds[0][i]) for i in range(num_classes)
@@ -169,13 +190,8 @@ def predict():
         if not allowed_file(file.filename):
             return jsonify({"error": "Invalid file type"}), 400
 
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
-
-        result = predict_image(filepath)
-
-        os.remove(filepath)
+        image_bytes = file.read()
+        result = predict_from_array(preprocess_image_bytes(image_bytes))
 
         return jsonify({
             "success": True,
@@ -183,6 +199,7 @@ def predict():
         })
 
     except Exception as e:
+        app.logger.exception("Prediction failed")
         return jsonify({"error": str(e)}), 500
 
 
@@ -193,12 +210,10 @@ def predict_url():
         url = data.get("image_url")
 
         import urllib.request
-        filepath = os.path.join(UPLOAD_FOLDER, "temp.jpg")
-        urllib.request.urlretrieve(url, filepath)
+        with urllib.request.urlopen(url) as response:
+            image_bytes = response.read()
 
-        result = predict_image(filepath)
-
-        os.remove(filepath)
+        result = predict_from_array(preprocess_image_bytes(image_bytes))
 
         return jsonify({
             "success": True,
@@ -206,6 +221,7 @@ def predict_url():
         })
 
     except Exception as e:
+        app.logger.exception("URL prediction failed")
         return jsonify({"error": str(e)}), 500
 
 
