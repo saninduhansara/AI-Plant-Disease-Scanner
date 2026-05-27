@@ -84,6 +84,11 @@ def load_model_compat(model_path):
 
 
 model = load_model_compat("new_rice_disease_model.keras")
+num_classes = int(model.output_shape[-1])
+class_labels = {
+    index: category_dict.get(index, f"Class {index}")
+    for index in range(num_classes)
+}
 
 # ===============================
 # Flask App
@@ -129,10 +134,10 @@ def predict_image(image_path):
 
     return {
         "class_id": int(class_id),
-        "disease": category_dict[class_id],
+        "disease": class_labels[int(class_id)],
         "confidence": round(confidence, 4),
         "all_probabilities": {
-            category_dict[i]: float(preds[0][i]) for i in range(len(category_dict))
+            class_labels[i]: float(preds[0][i]) for i in range(num_classes)
         }
     }
 
@@ -146,7 +151,7 @@ def health():
     return jsonify({
         "status": "ok",
         "model": "tensorflow-rice-disease",
-        "classes": category_dict
+        "classes": class_labels
     })
 
 
@@ -215,7 +220,7 @@ def docs():
         "app": "Rice Disease API",
         "framework": "TensorFlow",
         "input_size": IMG_SIZE,
-        "classes": category_dict
+        "classes": class_labels
     })
 
 

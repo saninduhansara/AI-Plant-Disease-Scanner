@@ -1,8 +1,9 @@
 flask
 flask-cors
-tensorflow==2.15.0
+tensorflow==2.21.0
 numpy
-opencv-python
+opencv-python-headless
 pillow
 werkzeug
 requests
+gunicorn
