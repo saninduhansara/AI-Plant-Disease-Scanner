@@ -427,6 +427,26 @@
             }
         }
 
+        async function prepareUploadFile(file) {
+            if (!file.type.startsWith('image/')) {
+                return file;
+            }
+
+            const bitmap = await createImageBitmap(file);
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+
+            const context = canvas.getContext('2d');
+            context.drawImage(bitmap, 0, 0, 128, 128);
+
+            const blob = await new Promise((resolve) => {
+                canvas.toBlob(resolve, 'image/jpeg', 0.9);
+            });
+
+            return new File([blob], 'upload.jpg', { type: 'image/jpeg' });
+        }
+
         // Predict button
         predictBtn.addEventListener('click', async () => {
             const file = fileInput.files[0];
@@ -435,8 +455,9 @@
                 return;
             }
 
+            const uploadFile = await prepareUploadFile(file);
             const formData = new FormData();
-            formData.append('file', file);
+            formData.append('file', uploadFile);
 
             loading.classList.add('show');
             clearError();

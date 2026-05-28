@@ -3,10 +3,7 @@ from flask_cors import CORS
 import tensorflow as tf
 import numpy as np
 import cv2
-import json
 import os
-import tempfile
-import zipfile
 from werkzeug.utils import secure_filename
 
 # ===============================
@@ -32,66 +29,24 @@ category_dict = {
 # ===============================
 # Load Model
 # ===============================
-def patch_legacy_keras_config(config):
-    if isinstance(config, dict):
-        config.pop("dtype", None)
-        config.pop("quantization_config", None)
-
-        class_name = config.get("class_name")
-        inner_config = config.get("config")
-
-        if isinstance(inner_config, dict):
-            inner_config.pop("dtype", None)
-            inner_config.pop("quantization_config", None)
-            inner_config.pop("optional", None)
-
-            if class_name == "InputLayer" and "batch_shape" in inner_config and "batch_input_shape" not in inner_config:
-                inner_config["batch_input_shape"] = inner_config.pop("batch_shape")
-
-            for value in inner_config.values():
-                patch_legacy_keras_config(value)
-
-        for key, value in list(config.items()):
-            if key != "config":
-                patch_legacy_keras_config(value)
-    elif isinstance(config, list):
-        for item in config:
-            patch_legacy_keras_config(item)
+def load_tflite_model(model_path):
+    interpreter = tf.lite.Interpreter(model_path=model_path)
+    interpreter.allocate_tensors()
+    return interpreter
 
 
-def load_model_compat(model_path):
-    try:
-        return tf.keras.models.load_model(model_path, compile=False)
-    except (TypeError, ValueError):
-        if not model_path.endswith(".keras"):
-            raise
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            patched_path = os.path.join(temp_dir, os.path.basename(model_path))
-
-            with zipfile.ZipFile(model_path, "r") as source_archive, zipfile.ZipFile(patched_path, "w") as target_archive:
-                for info in source_archive.infolist():
-                    file_data = source_archive.read(info.filename)
-
-                    if info.filename == "config.json":
-                        config = json.loads(file_data.decode("utf-8"))
-                        patch_legacy_keras_config(config)
-                        file_data = json.dumps(config).encode("utf-8")
-
-                    target_archive.writestr(info, file_data)
-
-            return tf.keras.models.load_model(patched_path, compile=False)
-
-
-model = load_model_compat("new_rice_disease_model.keras")
-num_classes = int(model.output_shape[-1])
+model = load_tflite_model("new_rice_disease_model.tflite")
+input_details = model.get_input_details()[0]
+output_details = model.get_output_details()[0]
+num_classes = int(output_details["shape"][-1])
 class_labels = {
     index: category_dict.get(index, f"Class {index}")
     for index in range(num_classes)
 }
 
-# Warm up TensorFlow so the first upload does not pay the full initialization cost.
-_ = model(np.zeros((1, IMG_SIZE, IMG_SIZE, 3), dtype=np.float32), training=False)
+# Warm up the interpreter so the first upload does not pay the full initialization cost.
+model.set_tensor(input_details["index"], np.zeros(input_details["shape"], dtype=input_details["dtype"]))
+model.invoke()
 
 # ===============================
 # Flask App
@@ -149,7 +104,9 @@ def predict_image(image_path):
 
 
 def predict_from_array(img):
-    preds = model(img, training=False).numpy()
+    model.set_tensor(input_details["index"], img.astype(input_details["dtype"]))
+    model.invoke()
+    preds = model.get_tensor(output_details["index"])
     class_id = int(np.argmax(preds))
     confidence = float(np.max(preds))
 
