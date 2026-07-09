@@ -11,7 +11,6 @@ from werkzeug.utils import secure_filename
 # ===============================
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'bmp', 'gif'}
-IMG_SIZE = 128
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -35,7 +34,7 @@ def load_tflite_model(model_path):
     return interpreter
 
 
-model = load_tflite_model("new_rice_disease_model.tflite")
+model = load_tflite_model("dis_model_with_aug.tflite")
 input_details = model.get_input_details()[0]
 output_details = model.get_output_details()[0]
 num_classes = int(output_details["shape"][-1])
@@ -43,6 +42,9 @@ class_labels = {
     index: category_dict.get(index, f"Class {index}")
     for index in range(num_classes)
 }
+
+# Dynamically set IMG_SIZE based on the loaded model's input shape
+IMG_SIZE = int(input_details["shape"][1])
 
 # Warm up the interpreter so the first upload does not pay the full initialization cost.
 model.set_tensor(input_details["index"], np.zeros(input_details["shape"], dtype=input_details["dtype"]))
