@@ -338,12 +338,15 @@ Where $\bullet$ denotes morphological closing ($\text{dilation}$ followed by $\t
 1. **Strict Leaf Tissue Mask:** Restricts analysis strictly to authentic green or chlorotic leaf blades while excluding text watermarks (e.g., `"5390490"` banner in `BS 2.jpg`), background soil, and grain shadows:
    - Green Tissue: $(G > R - 15) \wedge (G > B + 10) \wedge (G > 40)$
    - Chlorotic/Yellow Tissue: $(R > 70) \wedge (G > 65) \wedge (R + G > 2.1 B) \wedge (B < 120)$
-   - Combined Valid Leaf Mask: $\text{is\_leaf} = (\text{Green} \lor \text{Chlorotic}) \wedge (R + G + B < 680)$
-2. **Punctate Sori Criterion (Top-Hat Pit Threshold):** 
+   - Combined Valid Leaf Mask ($M_{\text{leaf}}$, implemented as `is_leaf`):
 
-$$\text{is\_sori} = \text{is\_leaf} \wedge \big(\text{TopHat} > 28.0\big) \wedge \big(\mathbf{I}_{\text{gray}} < 75.0\big)$$
+$$M_{\text{leaf}} = (\text{Green} \lor \text{Chlorotic}) \wedge (R + G + B < 680)$$
 
-$$\rho_{\text{sori}} = \frac{\sum \text{is\_sori}}{\sum \text{is\_leaf}}$$
+2. **Punctate Sori Criterion (Top-Hat Pit Threshold, `is_sori`):** 
+
+$$M_{\text{sori}} = M_{\text{leaf}} \wedge \big(\text{TopHat} > 28.0\big) \wedge \big(\mathbf{I}_{\text{gray}} < 75.0\big)$$
+
+$$\rho_{\text{sori}} = \frac{\sum M_{\text{sori}}}{\sum M_{\text{leaf}}}$$
 
 ### Calibrated Decision Fusion
 When punctate sori density exceeds the calibrated biological threshold ($\rho_{\text{sori}} > 0.035$ / $3.5\%$ as specified in `NN_architecture.jpg`):
